@@ -19,6 +19,7 @@ A command-line security assistant that explains shell commands in plain English,
 ### How This Project Uses GitHub Copilot CLI
 
 - **Core feature, not just tooling:** When a dangerous command is detected (e.g. `rm -rf`, `git reset --hard`), Cosmic SafeCLI calls **GitHub Copilot CLI** with a safety-focused prompt and displays the AI-suggested safer alternative in a formatted box. The user can then run that suggestion or skip.
+- **Robust Fallback:** If Copilot CLI fails (quota exceeded, network issue), the tool automatically switches to **Google Gemini API** (if configured via `.env`) or falls back to **safe local rules** (e.g., suggesting `rm -ri` instead of `rm -rf`).
 - **Graceful fallback:** If Copilot CLI is not installed, the app still explains commands and shows danger warnings; only the “safer suggestion” step is skipped.
 - **Dual runtime:** Same behavior in **Python** (`safe.py`) and **Node.js** (`cosmic-safecli.js`) so judges can run it with either stack.
 
@@ -41,15 +42,26 @@ A command-line security assistant that explains shell commands in plain English,
 
 ## Demo
 
-**Hackathon quick demo:** run one command to see the full flow (command box → warning → breakdown → Copilot suggestion).
+**Quick demo (30 seconds)**
+
+Run from the project root (the folder containing `safe.py`). The demo uses a **nonexistent path** so nothing in your project gets deleted.
+
+Python:
 
 ```bash
-python safe.py "rm -rf project"
+python safe.py "rm -rf /nonexistent/cosmic-demo-safe"
 ```
 
-Or use the demo script: **Windows** `run_demo.bat` · **Linux/macOS** `./run_demo.sh`
+Node.js:
 
-Full walkthrough, what you’ll see, and try-it-yourself steps: **[DEMO.md](DEMO.md)**.
+```bash
+npm start
+# or: node cosmic-safecli.js "rm -rf /nonexistent/cosmic-demo-safe"
+```
+
+You’ll see: **COMMAND** box → **WARNING** box → **🔍 Command Breakdown** → **🤖 Copilot Safer Suggestion** (if Copilot CLI is installed).
+
+Full walkthrough and more examples: [DEMO.md](DEMO.md)
 
 ---
 
@@ -126,8 +138,8 @@ cd Cosmic-SafeCli
 # Optional: colored output on Windows
 pip install -r requirements.txt
 
-# With a command
-python safe.py "rm -rf project"
+# With a command (use nonexistent path for demo so nothing gets deleted)
+python safe.py "rm -rf /nonexistent/cosmic-demo-safe"
 
 # Interactive mode (prompts for command)
 python safe.py
@@ -159,7 +171,8 @@ npm start
 python safe.py "ls -la"
 
 # Dangerous pattern — breakdown + warning + Copilot suggestion
-python safe.py "rm -rf /tmp/foo"
+# (Uses nonexistent path so safe to run from project folder.)
+python safe.py "rm -rf /nonexistent/cosmic-demo-safe"
 python safe.py "git reset --hard HEAD"
 python safe.py "chmod 777 script.sh"
 ```
@@ -196,3 +209,10 @@ MIT. See [LICENSE](LICENSE).
 - [**Challenge page**](https://dev.to/challenges/github-2026-01-21) — Submit your DEV post here
 - [**Contest rules**](https://dev.to/page/github-challenge-2026-01-21-contest-rules)
 - [**GitHub Copilot CLI**](https://github.com/features/copilot/cli) — Install & docs
+
+---
+
+## Updated
+
+- 2026-02-16: Synchronized README with recent code changes (removed automatic execution of Copilot suggestions in `safe.py`).
+- Repository pushed from local workspace to remote (see git history for details).

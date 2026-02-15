@@ -22,6 +22,38 @@ import os
 import shutil
 from typing import List, Dict, Any
 
+
+def run_command(cmd: str) -> int:
+    """Run a shell command in an OS-appropriate way and return the exit code.
+
+    On Windows prefer using cmd.exe for built-in commands (del, rmdir), but
+    otherwise run via the system shell. This centralizes any OS-specific
+    execution tweaks so the rest of the code can call a single helper.
+    """
+    try:
+        if os.name == 'nt':
+            # For Windows builtins, use cmd.exe /c to ensure they run correctly
+            builtin_prefixes = ('del ', 'rmdir ', 'rd ', 'copy ', 'move ')
+            trimmed = cmd.strip().lower()
+            if any(trimmed.startswith(p) for p in builtin_prefixes):
+                return subprocess.run(['cmd.exe', '/c', cmd], check=False).returncode
+            # Otherwise let shell handle it (should invoke Powershell/ cmd depending on environment)
+            return subprocess.run(cmd, shell=True, check=False).returncode
+        else:
+            # POSIX: using shell=True is acceptable for user-provided commands
+            return subprocess.run(cmd, shell=True, check=False).returncode
+    except Exception:
+        return 1
+
+
+def _safe_str(s: str) -> str:
+    enc = getattr(sys.stdout, 'encoding', None) or 'utf-8'
+    try:
+        s.encode(enc)
+        return s
+    except UnicodeEncodeError:
+        return s.encode(enc, errors='replace').decode(enc)
+
 # Colored output: try to use colorama for Windows compatibility, otherwise use ANSI fallbacks
 try:
     from colorama import Fore, Style, init as colorama_init
@@ -70,7 +102,7 @@ def _box_section(title: str, lines: List[str]) -> None:
     """Print a box with title and content lines (each line prefixed with two spaces)."""
     print(_box_top(title))
     for line in lines:
-        print('  ' + line)
+        print('  ' + _safe_str(line))
     print(_box_bottom())
 
 
@@ -151,138 +183,67 @@ def get_copilot_suggestion(command: str, timeout: int = 15, api_key: str = None,
     env = os.environ.copy()
     if api_key:
         env['COPILOT_API_KEY'] = api_key
+    
+    # Force non-interactive mode for new Copilot CLI (GitHub.Copilot package)
+    env['CI'] = 'true'
 
-    # Try 'gh copilot suggest' first (GitHub CLI extension - Preferred)
+    # Use standalone 'copilot' CLI only (no 'gh' variants). Prefer non-interactive
+    # `--prompt` calls first to avoid hanging interactive invocations.
+
+    # Ensure copilot binary is available
+    if shutil.which(copilot_path) is None:
+        return f"GitHub Copilot CLI not found. Install the standalone 'copilot' CLI and ensure it's on PATH."
+
+    # Try legacy/non-interactive syntax first (safer)
     try:
-        # Check if gh is available (by running specific command)
-        # We use a nested try because we want to fallback to 'copilot' command if gh fails
-        gh_cmd = ['gh', 'copilot', 'suggest', '-t', 'shell', prompt]
-        
-        # If 'gh' is not in PATH, try absolute path if on Windows default
-        if shutil.which('gh') is None and os.name == 'nt':
-             default_gh = r"C:\Program Files\GitHub CLI\gh.exe"
-             if os.path.exists(default_gh):
-                 gh_cmd[0] = default_gh
-
-        gh_completed = subprocess.run(
-            gh_cmd,
-            env=env, capture_output=True, text=True, timeout=timeout,
-            encoding='utf-8', errors='replace'
-        )
-        
-        if gh_completed.returncode == 0:
-            return gh_completed.stdout.strip()
-        
-        # If gh failed (e.g. extension not installed, or not auth), we might want to try legacy 'copilot'
-        # BUT user asked to "use this instead", so maybe we should report the gh error if it looks like an auth/install issue?
-        # Let's fallback to legacy 'copilot' only if 'gh' command itself wasn't found or returned specific error?
-        # Actually safer to just try legacy copilot as fallback.
-        
-    except FileNotFoundError:
-        pass # gh not found, proceed to legacy copilot
-    except Exception:
-        pass # gh failed, proceed
-
-    # Standalone 'copilot' CLI (New and Legacy)
-    try:
-        # Check if we should use new syntax: `copilot --prompt "prompt"` (Clean, no extra flags)
-        # The new Winget 'GitHub.Copilot' CLI uses -p/--prompt but fails with --silent or --model sometimes.
-        # We'll try basic prompt execution first.
-        
-        # New Standalone Syntax (Clean)
-        # Note: We use --prompt which is alias for -p, widely supported.
-        new_cmd = [copilot_path, '--prompt', prompt]
-        completed = subprocess.run(
-            new_cmd,
-            env=env, capture_output=True, text=True, timeout=timeout,
-            encoding='utf-8', errors='replace'
-        )
-        
-        if completed.returncode == 0 and completed.stdout.strip():
-             return completed.stdout.strip()
-             
-        # If clean prompt failed, maybe it needs legacy flags (start-server, model, silent etc.)
-        # Fallthrough...
-        
-    except (FileNotFoundError, Exception):
-        pass
-
-    try:
-        # Legacy syntax with strict flags
-        # Some older versions REQUIRE --model and --silent
         completed = subprocess.run(
             [copilot_path, '--prompt', prompt, '--model', model, '--silent'],
             env=env, capture_output=True, text=True, timeout=timeout,
             encoding='utf-8', errors='replace'
         )
+        if completed.returncode == 0 and completed.stdout.strip():
+            return completed.stdout.strip()
         if completed.returncode != 0:
-            err = completed.stderr.strip()
+            err = (completed.stderr or '').strip()
             if '402' in err or 'quota' in err.lower():
                 return f"{Fore.RED}GitHub Copilot quota exceeded (HTTP 402).{Fore.RESET} You have no quota remaining."
             if err:
                 return f"Copilot returned an error: {err}"
-            return "Copilot did not return a suggestion."
-        return completed.stdout.strip() or "Copilot returned no output."
-    except FileNotFoundError:
-        return f"GitHub Copilot CLI not found. Install 'gh' with 'copilot' extension."
+            # Fall through to try alternative invocation
     except subprocess.TimeoutExpired:
-        return "Copilot request timed out. Try again or use --copilot-timeout 60 (or higher)."
+        print(f"{Fore.YELLOW}⚠ Copilot request timed out after {timeout}s{Fore.RESET}", file=sys.stderr)
+    except FileNotFoundError:
+        return f"GitHub Copilot CLI not found. Install the standalone 'copilot' CLI and ensure it's on PATH."
+    except Exception as e:
+        # Continue to try alternative invocation
+        pass
+
+    # Try the newer '-i' immediate invocation as a fallback
+    try:
+        new_cmd = [copilot_path, '-i', prompt, '--allow-all-tools']
+        completed = subprocess.run(
+            new_cmd,
+            env=env, capture_output=True, text=True, timeout=timeout,
+            encoding='utf-8', errors='replace'
+        )
+        if completed.returncode == 0 and completed.stdout.strip():
+            return completed.stdout.strip()
+        if completed.returncode != 0:
+            copilot_error = (completed.stderr or '').strip() or f"Exit code {completed.returncode}"
+            print(f"{Fore.YELLOW}⚠ copilot -i failed: {copilot_error}{Fore.RESET}", file=sys.stderr)
+    except subprocess.TimeoutExpired:
+        print(f"{Fore.YELLOW}⚠ Copilot request timed out after {timeout}s{Fore.RESET}", file=sys.stderr)
+        return "Copilot request timed out."
+    except FileNotFoundError:
+        return f"GitHub Copilot CLI not found. Install the standalone 'copilot' CLI and ensure it's on PATH."
+    except Exception as e:
+        return f"Failed to run Copilot: {e}"
+    except subprocess.TimeoutExpired:
+        print(f"{Fore.YELLOW}⚠ Copilot request timed out after {timeout}s{Fore.RESET}", file=sys.stderr)
+        return "Copilot request timed out."
     except Exception as e:
         return f"Failed to run Copilot: {e}"
 
-
-def get_gemini_suggestion(command: str, api_key: str) -> str:
-    """Call Google Gemini API for a safety suggestion.
-    
-    Uses standard library urllib to avoid extra dependencies.
-    """
-    if not api_key:
-        return "Gemini API key not provided."
-        
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-    headers = {'Content-Type': 'application/json'}
-    
-    prompt_text = (
-        "You are a Linux safety assistant. The user wants to run this command:\n"
-        f"{command}\n\n"
-        "Explain briefly why it is dangerous and suggest a safer alternative command.\n"
-        "Keep answer short. Output only the safely suggested command if possible, or a very brief explanation."
-    )
-    
-    data = {
-        "contents": [{
-            "parts": [{"text": prompt_text}]
-        }]
-    }
-    
-    import time
-    
-    retries = 3
-    for attempt in range(retries):
-        try:
-            import urllib.request
-            import urllib.error
-            
-            req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers, method='POST')
-            with urllib.request.urlopen(req) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                
-            # Extract text from response
-            try:
-                return result['candidates'][0]['content']['parts'][0]['text'].strip()
-            except (KeyError, IndexError, TypeError) as e:
-                return f"Failed to parse Gemini response: {e}"
-                
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                if attempt < retries - 1:
-                    wait_time = 2 ** attempt # 1s, 2s, 4s...
-                    print(f"{Fore.YELLOW}Gemini rate limited. Retrying in {wait_time}s...{Fore.RESET}")
-                    time.sleep(wait_time)
-                    continue
-            return f"Gemini API request failed: {e.code} {e.reason}"
-        except Exception as e:
-            return f"Gemini API error: {e}"
 
 
 def generate_fallback(command_tokens: List[str]) -> str:
@@ -347,12 +308,16 @@ def generate_fallback(command_tokens: List[str]) -> str:
 
     # 3. git reset --hard -> git restore --staged .
     if cmd == 'git' and 'reset' in args and '--hard' in args:
-        return "git restore --staged ."
+        return "git restore --staged .  # or consider 'git reset --soft <commit>' to avoid data loss"
         
     # 4. git clean -fd -> git clean -n
     if cmd == 'git' and 'clean' in args:
         if '-fd' in args or '-df' in args or ('-f' in args and '-d' in args):
             return "git clean -n"
+
+    # 4b. git push --force -> git push --force-with-lease
+    if cmd == 'git' and 'push' in args and ('--force' in args or '-f' in args):
+        return "git push --force-with-lease"
 
     # 5. dd -> echo "Dangerous..."
     if cmd == 'dd':
@@ -407,11 +372,7 @@ def main():
     # Load .env file
     load_env()
     
-    # DEFAULT COMPATIBILITY KEY removed for security
-    DEFAULT_GEMINI_KEY = None
-    
-    # Get Gemini key from environment or use default (None if not provided)
-    gemini_key = os.environ.get('GEMINI_API_KEY') or DEFAULT_GEMINI_KEY
+    # (No Gemini fallback) — only Copilot is used now
 
     parser = argparse.ArgumentParser(description='Cosmic SafeCLI — Understand Before You Execute')
     parser.add_argument('command', nargs='?', default=None, help='The full command to analyze (quote it if it contains spaces)')
@@ -421,7 +382,6 @@ def main():
     parser.add_argument('--copilot-path', default='copilot', help='Path to the Copilot CLI executable')
     parser.add_argument('--copilot-model', default='gpt-4.1', help='Model to use for Copilot CLI (default: gpt-4.1)')
     parser.add_argument('--copilot-timeout', type=int, default=15, help='Seconds to wait for Copilot CLI (default: 15)')
-    parser.add_argument('--gemini-key', default=gemini_key, help='Google Gemini API key for fallback')
     args = parser.parse_args()
 
     # Header
@@ -476,11 +436,11 @@ def main():
 
     # Command breakdown
     print()
-    print('🔍 Command Breakdown')
+    print(_safe_str('🔍 Command Breakdown'))
     print(_rule())
     max_len = max(len(t) for t, _ in breakdown)
     for token, explanation in breakdown:
-        print(f"  • {token.ljust(max_len)}  ->  {explanation}")
+        print(_safe_str(f"  • {token.ljust(max_len)}  ->  {explanation}"))
     print(_rule())
 
         # Copilot suggestion box (if dangerous)
@@ -489,38 +449,27 @@ def main():
         print(f"{Fore.CYAN}Contacting GitHub Copilot...{Fore.RESET}")
         suggestion = get_copilot_suggestion(cmd, timeout=args.copilot_timeout, api_key=args.copilot_key, copilot_path=args.copilot_path, model=args.copilot_model)
         
+        # Ensure suggestion is a string (Copilot timeout may return None)
+        if suggestion is None:
+            suggestion = 'Copilot request timed out.'
+
         # Check if Copilot returned an error; if so, use fallback
         import re
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        clean_suggestion = ansi_escape.sub('', suggestion).strip()
+        clean_suggestion = ansi_escape.sub('', str(suggestion)).strip()
         
         err_starts = ('Copilot returned', 'Copilot CLI not found', 'Copilot did not',
-                      'Copilot request', 'Failed to run Copilot', 'Did you mean:', 'For non-interactive',
-                      'GitHub Copilot quota exceeded', 'No safe automatic alternative', 'Gemini API')
+                  'Copilot request', 'Failed to run Copilot', 'Did you mean:', 'For non-interactive',
+                  'GitHub Copilot quota exceeded', 'No safe automatic alternative')
 
         is_error = any(clean_suggestion.startswith(s) for s in err_starts) or not clean_suggestion
         
         if is_error:
-            # Try Gemini Fallback
-            if args.gemini_key:
-                print(f"{Fore.CYAN}Copilot unavailable. Contacting Google Gemini...{Fore.RESET}")
-                gemini_suggestion = get_gemini_suggestion(cmd, args.gemini_key)
-                
-                # Check if Gemini failed
-                clean_gemini = ansi_escape.sub('', gemini_suggestion).strip()
-                if any(clean_gemini.startswith(s) for s in ('Gemini API', 'Failed to parse')):
-                     print(f"{Fore.RED}Gemini fallback failed: {clean_gemini}{Fore.RESET}")
-                     # Fall through to local rules
-                else:
-                    suggestion = gemini_suggestion
-                    is_error = False # Gemini worked!
-            
-            # If still error (no Gemini key or Gemini failed), use local rules
-            if is_error:
-                print(f"{Fore.YELLOW}Copilot/Gemini unavailable — using local safety rules.{Fore.RESET}")
-                suggestion = generate_fallback(tokens)
-                # Re-clean suggestion as it is now the fallback
-                clean_suggestion = suggestion.strip()
+            # No Gemini fallback configured — use local safety rules
+            print(f"{Fore.YELLOW}Copilot unavailable — using local safety rules.{Fore.RESET}")
+            suggestion = generate_fallback(tokens)
+            # Re-clean suggestion as it is now the fallback
+            clean_suggestion = str(suggestion).strip()
         
         # First line as "Use: ..." if it looks like a command; otherwise show full suggestion
         suggestion_lines = suggestion.strip().splitlines()
@@ -548,44 +497,11 @@ def main():
             suggestion_display = [suggestion.strip() or 'No suggestion.']
         _box_section(' 🤖 Copilot Safer Suggestion ', suggestion_display)
 
-        # Ask the user whether to proceed with the suggested command ONLY if it's not an error
-        import re
-        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        clean_suggestion = ansi_escape.sub('', suggestion).strip()
-        
-        if not any(clean_suggestion.startswith(s) for s in err_starts):
-            try:
-                proceed = input('\nExecute suggested command? (y/N): ').strip().lower()
-            except EOFError:
-                proceed = 'n'
-            if proceed in ('y', 'yes'):
-                try:
-                    exec_cmd = input('Enter command to execute (leave empty to use Copilot suggestion): ').strip()
-                except EOFError:
-                    exec_cmd = ''
-                if not exec_cmd:
-                    # Fallback: take first non-empty line from Copilot suggestion (skip error messages)
-                    exec_cmd = ''
-                    err_prefixes = ('Copilot returned an error', 'Copilot CLI not found', 'Copilot did not',
-                                    'Copilot request timed out', 'Failed to run Copilot', 'Did you mean:',
-                                    'For non-interactive mode', 'Try ', 'Invalid command format',
-                                    'GitHub Copilot quota exceeded')
-                    for line in suggestion.splitlines():
-                        line = line.strip().strip('`')
-                        if line and not any(line.startswith(p) for p in err_prefixes):
-                            exec_cmd = line
-                            break
-                if not exec_cmd:
-                    print('No command to execute. Aborting.')
-                else:
-                    print(f'Running: {exec_cmd}')
-                    try:
-                        # Use capture_output=False to allow interactive commands (like rd /s confirmation)
-                        subprocess.run(exec_cmd, shell=True, check=False)
-                    except Exception as e:
-                        print(f'Failed to execute command: {e}')
-            else:
-                print('Not executing suggested command.')
+        # Execution capability removed: only display Copilot suggestions.
+        # For safety we no longer prompt to execute or run suggested commands.
+        print()
+        print(_safe_str('Execution of suggested commands has been disabled for safety.'))
+        print(_safe_str('Review the Copilot suggestion above and run any commands manually if you choose.'))
     else:
         print('\nNo known dangerous patterns detected.')
 
