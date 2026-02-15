@@ -1,0 +1,12 @@
+{
+  "rm": "remove files or directories",
+  "-r": "recursive, operate on directories and their contents",
+  "-f": "force, ignore nonexistent files and never prompt",
+  "-rf": "combination of -r and -f (recursive + force)",
+  "git": "version control system",
+  "reset": "move branch pointer",
+  "--hard": "reset working tree and index; discard local changes permanently",
+  "chmod": "change file permissions",
+  "777": "permission value granting read/write/execute to everyone",
+  "sudo": "run command as another user (usually root), elevated privileges"
+}

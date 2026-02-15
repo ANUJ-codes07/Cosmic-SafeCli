@@ -1,0 +1,10 @@
+{
+  "name": "cosmic-safecli",
+  "version": "1.0.0",
+  "description": "CLI that explains shell commands and uses GitHub Copilot CLI to suggest safer alternatives. GitHub Copilot CLI Challenge.",
+  "license": "MIT",
+  "scripts": { "start": "node cosmic-safecli.js" },
+  "dependencies": { "chalk": "^5.6.2" },
+  "keywords": ["cli", "github-copilot", "security", "shell", "devchallenge", "githubchallenge"],
+  "engines": { "node": ">=14" }
+}

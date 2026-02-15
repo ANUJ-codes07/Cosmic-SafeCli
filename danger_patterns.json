@@ -1,0 +1,22 @@
+[
+  {
+    "pattern": "rm -rf",
+    "explanation": "Recursively and forcefully deletes files and directories; can remove large parts of the filesystem with no confirmation.",
+    "advice": "Double-check the path, avoid running as root, use 'rm -r' without -f to be prompted, or use a safe recycle/trash utility."
+  },
+  {
+    "pattern": "git reset --hard",
+    "explanation": "Resets HEAD and working tree to a specified state, discarding local changes permanently.",
+    "advice": "Create a branch or stash changes before resetting. Consider using 'git restore' for targeted file restores."
+  },
+  {
+    "pattern": "chmod 777",
+    "explanation": "Grants all users read/write/execute permissions, potentially exposing sensitive files.",
+    "advice": "Use more restrictive permissions like 755 or 700 depending on needs."
+  },
+  {
+    "pattern": "sudo rm -rf /",
+    "explanation": "Deletes the root filesystem when run as root; will likely render the system unusable.",
+    "advice": "Never run this command; avoid scripts that construct rm commands with unchecked variables."
+  }
+]

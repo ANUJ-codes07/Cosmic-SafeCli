@@ -1,0 +1,2 @@
+# Optional: enables colored output on Windows (safe.py works without it)
+colorama>=0.4.6
