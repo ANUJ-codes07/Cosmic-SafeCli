@@ -164,6 +164,31 @@ npm start
 
 ---
 
+## Cloning the repository
+
+You can clone this repository using either HTTPS or SSH. Replace the URL with
+the repo you forked if you're contributing.
+
+HTTPS:
+
+```bash
+git clone https://github.com/ANUJ-codes07/Cosmic-SafeCli.git
+```
+
+SSH (requires SSH key configured with GitHub):
+
+```bash
+git clone git@github.com:ANUJ-codes07/Cosmic-SafeCli.git
+```
+
+After cloning, change into the project directory:
+
+```bash
+cd Cosmic-SafeCli
+```
+
+---
+
 ## Examples
 
 ```bash
