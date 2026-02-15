@@ -1,0 +1,77 @@
+Checking models for key: AIzaSyA_76...
+Successfully retrieved models:
+- models/gemini-2.5-flash
+  (Supports generateContent)
+- models/gemini-2.5-pro
+  (Supports generateContent)
+- models/gemini-2.0-flash
+  (Supports generateContent)
+- models/gemini-2.0-flash-001
+  (Supports generateContent)
+- models/gemini-2.0-flash-exp-image-generation
+  (Supports generateContent)
+- models/gemini-2.0-flash-lite-001
+  (Supports generateContent)
+- models/gemini-2.0-flash-lite
+  (Supports generateContent)
+- models/gemini-exp-1206
+  (Supports generateContent)
+- models/gemini-2.5-flash-preview-tts
+  (Supports generateContent)
+- models/gemini-2.5-pro-preview-tts
+  (Supports generateContent)
+- models/gemma-3-1b-it
+  (Supports generateContent)
+- models/gemma-3-4b-it
+  (Supports generateContent)
+- models/gemma-3-12b-it
+  (Supports generateContent)
+- models/gemma-3-27b-it
+  (Supports generateContent)
+- models/gemma-3n-e4b-it
+  (Supports generateContent)
+- models/gemma-3n-e2b-it
+  (Supports generateContent)
+- models/gemini-flash-latest
+  (Supports generateContent)
+- models/gemini-flash-lite-latest
+  (Supports generateContent)
+- models/gemini-pro-latest
+  (Supports generateContent)
+- models/gemini-2.5-flash-lite
+  (Supports generateContent)
+- models/gemini-2.5-flash-image
+  (Supports generateContent)
+- models/gemini-2.5-flash-preview-09-2025
+  (Supports generateContent)
+- models/gemini-2.5-flash-lite-preview-09-2025
+  (Supports generateContent)
+- models/gemini-3-pro-preview
+  (Supports generateContent)
+- models/gemini-3-flash-preview
+  (Supports generateContent)
+- models/gemini-3-pro-image-preview
+  (Supports generateContent)
+- models/nano-banana-pro-preview
+  (Supports generateContent)
+- models/gemini-robotics-er-1.5-preview
+  (Supports generateContent)
+- models/gemini-2.5-computer-use-preview-10-2025
+  (Supports generateContent)
+- models/deep-research-pro-preview-12-2025
+  (Supports generateContent)
+- models/gemini-embedding-001
+- models/aqa
+- models/imagen-4.0-generate-preview-06-06
+- models/imagen-4.0-ultra-generate-preview-06-06
+- models/imagen-4.0-generate-001
+- models/imagen-4.0-ultra-generate-001
+- models/imagen-4.0-fast-generate-001
+- models/veo-2.0-generate-001
+- models/veo-3.0-generate-001
+- models/veo-3.0-fast-generate-001
+- models/veo-3.1-generate-preview
+- models/veo-3.1-fast-generate-preview
+- models/gemini-2.5-flash-native-audio-latest
+- models/gemini-2.5-flash-native-audio-preview-09-2025
+- models/gemini-2.5-flash-native-audio-preview-12-2025

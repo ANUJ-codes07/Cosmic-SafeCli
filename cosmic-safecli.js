@@ -91,7 +91,7 @@ function getCopilotSuggestion(command, copilotPath = 'copilot', timeout = 10000)
   const prompt = `You are a Linux safety assistant. The user wants to run this command:\n${command}\nExplain briefly why it is dangerous and suggest a safer alternative. Keep answer short.`;
   return new Promise(resolve => {
     try {
-      execFile(copilotPath, [prompt], { timeout }, (err, stdout, stderr) => {
+      execFile(copilotPath, ['--prompt', prompt], { timeout }, (err, stdout, stderr) => {
         if (err) {
           if (err.code === 'ENOENT') return resolve(`Copilot CLI not found at '${copilotPath}'.`);
           if (stderr) return resolve(`Copilot error: ${stderr.trim()}`);
