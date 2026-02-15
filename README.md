@@ -26,6 +26,7 @@ A command-line security assistant that explains shell commands in plain English,
 
 ## Table of Contents
 
+- [Demo](#demo)
 - [Overview](#overview)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
@@ -35,6 +36,20 @@ A command-line security assistant that explains shell commands in plain English,
 - [Examples](#examples)
 - [Project Structure](#project-structure)
 - [License](#license)
+
+---
+
+## Demo
+
+**Hackathon quick demo:** run one command to see the full flow (command box → warning → breakdown → Copilot suggestion).
+
+```bash
+python safe.py "rm -rf project"
+```
+
+Or use the demo script: **Windows** `run_demo.bat` · **Linux/macOS** `./run_demo.sh`
+
+Full walkthrough, what you’ll see, and try-it-yourself steps: **[DEMO.md](DEMO.md)**.
 
 ---
 
@@ -162,6 +177,8 @@ Example output for a dangerous command: **COMMAND** box → **WARNING** box → 
 | `commands.json` | Map of tokens (e.g. `rm`, `-rf`) to short explanations. |
 | `danger_patterns.json` | Dangerous patterns with `pattern`, `explanation`, and `advice`. |
 | `requirements.txt` | Python dependencies (optional `colorama`). |
+| `DEMO.md` | Hackathon demo walkthrough — quick run, what you’ll see, try-it-yourself. |
+| `run_demo.bat` / `run_demo.sh` | One-click demo script (Windows / Linux & macOS). |
 | `SUBMISSION.md` | Draft for the DEV challenge submission post. |
 | `CONTRIBUTING.md` | How to run, extend, and contribute. |
 | `PUSH_TO_GITHUB.md` | Step-by-step: push this repo to GitHub for the challenge. |
